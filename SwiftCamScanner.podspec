@@ -15,7 +15,7 @@ s.homepage         = 'https://github.com/Srinija/SwiftCamScanner'
 s.license          = { :type => 'MIT', :file => 'LICENSE' }
 s.author           = 'Srinija Ammapalli'
 s.source           = { :git => 'https://github.com/Srinija/SwiftCamScanner.git', :tag => s.version.to_s }
-s.ios.deployment_target = '8.0'
+s.ios.deployment_target = '15.0'
 s.source_files = 'SwiftCamScanner/Classes/**/*'
 # s.public_header_files = 'Pod/Classes/**/*.h'
 s.dependency 'OpenCV'

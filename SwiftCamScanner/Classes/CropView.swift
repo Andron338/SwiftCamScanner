@@ -6,6 +6,7 @@
 //  Copyright © 2017 Srinija Ammapalli. All rights reserved.
 //
 import UIKit
+import Vision
 
 public class CropView: UIView {
     
@@ -54,9 +55,7 @@ public class CropView: UIView {
             cropFrame = cropImageView.frame
             setUpCropRegion()
             setUpGestureRecognizer()
-            
         }
-        
     }
     
     /**
@@ -108,28 +107,56 @@ public class CropView: UIView {
         self.layer.addSublayer(border)
         
         //Get crop rectangle
-        var i = 1
-        let x = cropImageView.frame.origin.x
-        let y = cropImageView.frame.origin.y
-        let width = cropImageView.frame.width
-        let height = cropImageView.frame.height
         
-        let points = OpenCVWrapper.getLargestSquarePoints(cropImageView.image, cropImageView.frame.size)
+        let request = VNDetectDocumentSegmentationRequest(completionHandler: { (request: VNRequest, error: Error?) in
+            DispatchQueue.main.async {
+                
+                guard let results = request.results as? [VNRectangleObservation] else { return }
+                
+                guard let rect = results.first else{return}
+                self.drawCroppingRectangle(from: rect)
+            }
+        })
+        
+        guard let buffer = cropImageView.image?.buffer else { return }
+        
+        let imageRequestHandler = VNImageRequestHandler(cvPixelBuffer: buffer, options: [:])
+        try? imageRequestHandler.perform([request])
+    }
+    
+    //MARK: Draw cropping rectangle from VNRectangleObservation
+    
+    private func drawCroppingRectangle(from rect: VNRectangleObservation) {
+        let transform = CGAffineTransform(scaleX: 1, y: -1).translatedBy(x: 0, y: -cropImageView.frame.height)
+        let scale = CGAffineTransform.identity.scaledBy(x: cropImageView.frame.width, y: cropImageView.frame.height)
+
+        let bounds = rect.boundingBox.applying(scale).applying(transform)
+        /*
+         bounds         points
+         . ------- .    0 ------- 1
+         |         |    |         |
+         |         |    |         |
+         |         |    |         |
+         origin -- .    4 ------- 3
+         */
+        let points = [
+            CGPoint(x: bounds.origin.x, y: bounds.origin.y + bounds.height),
+            CGPoint(x: bounds.origin.x + bounds.width, y: bounds.origin.y + bounds.height),
+            CGPoint(x: bounds.origin.x + bounds.width, y: bounds.origin.y),
+            bounds.origin
+        ]
+        
+        var i = 1
         var endPoints = [CGPoint]()
         
-        //Add crop points and circles
-        if let points = points{
-            for i in (0...3) {
-                let newPoint = points[i] as! CGPoint
-                endPoints.append(CGPoint(x: newPoint.x + x, y: newPoint.y+y))
-            }
-        }else{
-            endPoints.append(CGPoint(x: x, y: y))
-            endPoints.append(CGPoint(x: x+width, y: y))
-            endPoints.append(CGPoint(x: x+width, y: y+height))
-            endPoints.append(CGPoint(x: x, y: y+height))
-        }
+        let x = cropImageView.frame.origin.x
+        let y = cropImageView.frame.origin.y
         
+        //Add crop points and circles
+        
+        points.forEach { point in
+            endPoints.append(CGPoint(x: point.x + x, y: point.y+y))
+        }
         
         while(i<=8){
             let cropCircle = UIView()
@@ -389,12 +416,10 @@ public class CropView: UIView {
         let xPow = pow((point1.x - point2.x), 2)
         let yPow = pow((point1.y - point2.y), 2)
         return CGFloat(sqrtf(Float(xPow + yPow)))
-        
     }
     
     ///Returns the center of two CGPoints
     private func centerOf(firstPoint: CGPoint, secondPoint: CGPoint) -> CGPoint{
         return CGPoint(x: (firstPoint.x+secondPoint.x)/2, y: (firstPoint.y + secondPoint.y)/2)
     }
-    
 }
